@@ -1,0 +1,6 @@
+backend/.env*
+frontend/.env*
+
+
+**/.envbackend/.env.development
+*.env*
