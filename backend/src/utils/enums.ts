@@ -11,3 +11,9 @@ export enum StatusCode {
   INTERNAL_SERVER_ERROR = 500,
   SERVICE_UNAVAILABLE = 503,
 }
+
+
+export enum Roles {
+  ADMIN = "admin",
+  USER = "user",
+}

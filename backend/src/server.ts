@@ -12,6 +12,9 @@ import cors, { CorsOptions } from "cors";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import { StatusCode } from "./utils/enums"; 
+import userRoutes from "./routes/userRoutes";
+import movieRoutes from "./routes/movieRoutes";
+import redisClient from "./config/redis";
 
 const app = express();
 const PORT: number = Number(process.env.PORT) || 3000;
@@ -39,6 +42,9 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+//routes
+app.use("/api/user",userRoutes)
+app.use("/api/movies",movieRoutes)
 
 // 404 handler
 app.use("/api", (_req, res) => {
@@ -51,7 +57,9 @@ app.use("/api", (_req, res) => {
 
 const startServer = async () => {
   try {
-    await connectDB(); // Connect to MongoDB
+    await connectDB();
+    await redisClient.ping()
+    console.log("Redis connected successfully")
     app.listen(PORT, () => {
       console.log(`Server running in ${process.env.NODE_ENV || "development"} mode`);
     });

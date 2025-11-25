@@ -4,5 +4,4 @@ export interface UserSlice {
   email: string | null;
   role: string | null;
   isBlocked: string | null;
-  profilePicture: string | null;
 }

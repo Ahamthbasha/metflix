@@ -7,7 +7,6 @@ const initialState: UserSlice = {
   email: null,
   role: null,
   isBlocked: null,
-  profilePicture: null,
 };
 
 const userSlice = createSlice({
@@ -22,10 +21,9 @@ const userSlice = createSlice({
         email: string;
         role: string;
         isBlocked: boolean | string;
-        profilePicUrl: string | null;
       }>
     ) => {
-      const { _id, username, email, role, isBlocked, profilePicUrl } =
+      const { _id, username, email, role, isBlocked} =
         action.payload;
 
       state.userId = _id;
@@ -33,7 +31,6 @@ const userSlice = createSlice({
       state.email = email;
       state.role = role;
       state.isBlocked = String(isBlocked);
-      state.profilePicture = profilePicUrl;
 
       localStorage.setItem("user", JSON.stringify(state));
     },
@@ -44,7 +41,6 @@ const userSlice = createSlice({
       state.email = null;
       state.role = null;
       state.isBlocked = null;
-      state.profilePicture = null;
 
       localStorage.removeItem("user");
     },
