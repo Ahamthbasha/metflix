@@ -3,8 +3,9 @@ import { userMovieController } from "../config/dependencyInjector/userDependency
 
 const router = Router();
 
-router.get("/search",userMovieController.searchMovies.bind(userMovieController));
-router.get("/favourites",userMovieController.getFavourites.bind(userMovieController));
-router.post("/toggleFavourite",userMovieController.toggleFavorite.bind(userMovieController));
+router.get("/search", userMovieController.searchMovies.bind(userMovieController));
+router.get("/popular", userMovieController.getPopularMovies.bind(userMovieController));
+router.get("/favourites", userMovieController.getFavourites.bind(userMovieController));
+router.post("/toggleFavourite", userMovieController.toggleFavorite.bind(userMovieController));
 
-export default router
+export default router;

@@ -1,3 +1,4 @@
+// src/controllers/userController/UserMovieController.ts
 import { Request, Response } from 'express';
 import { IUserMovieService } from '../../services/userService/interfaces/IUserMovieService'; 
 import { IUserMovieController } from './interfaces/IUserMovieController';
@@ -23,6 +24,15 @@ export class UserMovieController implements IUserMovieController {
         return;
       }
 
+      // Validate minimum search length on controller level too
+      if (q.trim().length < 2) {
+        res.status(StatusCode.BAD_REQUEST).json({
+          success: false,
+          error: 'Search query must be at least 2 characters long',
+        });
+        return;
+      }
+
       const pageNum = parseInt(page as string, 10);
       if (isNaN(pageNum) || pageNum < 1) {
         res.status(StatusCode.BAD_REQUEST).json({
@@ -35,17 +45,43 @@ export class UserMovieController implements IUserMovieController {
       const result = await this.movieService.searchMovies(q, pageNum);
 
       if (result.Response === 'False') {
-        res.status(StatusCode.NOT_FOUND).json({
+        // Use appropriate status code based on error type
+        const statusCode = result.Error?.includes('specific') || result.Error?.includes('Too many')
+          ? StatusCode.BAD_REQUEST
+          : StatusCode.NOT_FOUND;
+
+        res.status(statusCode).json({
           success: false,
           error: result.Error || MESSAGES.NO_MOVIES_FOUND,
         });
         return;
       }
 
+      // Get favorite status for all movies in search results
+      const imdbIDs = result.Search?.map(movie => movie.imdbID) || [];
+      const favoriteStatus = this.movieService.getFavoriteStatus(imdbIDs);
+
+      // Attach isFavorite to each movie
+      const moviesWithFavoriteStatus = result.Search?.map(movie => ({
+        ...movie,
+        isFavorite: favoriteStatus[movie.imdbID] || false,
+      }));
+
+      // Enhanced response with pagination metadata
       res.status(StatusCode.OK).json({
         success: true,
         message: MESSAGES.MOVIES_FOUND,
-        data: result,
+        data: {
+          Search: moviesWithFavoriteStatus,
+          totalResults: result.totalResults,
+          Response: result.Response,
+        },
+        pagination: {
+          currentPage: pageNum,
+          totalResults: parseInt(result.totalResults || '0', 10),
+          resultsPerPage: result.Search?.length || 0,
+          hasMore: result.Search && parseInt(result.totalResults || '0', 10) > (pageNum * 10),
+        }
       });
     } catch (error: any) {
       console.error('Search movies error:', error);
@@ -57,21 +93,81 @@ export class UserMovieController implements IUserMovieController {
     }
   }
 
+  async getPopularMovies(_req: Request, res: Response): Promise<void> {
+    try {
+      // Fetch popular movies
+      const popularMovies = await this.movieService.getPopularMovies();
+
+      if (popularMovies.length === 0) {
+        res.status(StatusCode.NOT_FOUND).json({
+          success: false,
+          error: 'Failed to fetch popular movies',
+        });
+        return;
+      }
+
+      // Get favorite status for all popular movies
+      const imdbIDs = popularMovies.map(movie => movie.imdbID);
+      const favoriteStatus = this.movieService.getFavoriteStatus(imdbIDs);
+
+      // Attach isFavorite to each movie
+      const moviesWithFavoriteStatus = popularMovies.map(movie => ({
+        ...movie,
+        isFavorite: favoriteStatus[movie.imdbID] || false,
+      }));
+
+      res.status(StatusCode.OK).json({
+        success: true,
+        message: 'Popular movies retrieved successfully',
+        data: { movies: moviesWithFavoriteStatus },
+        count: moviesWithFavoriteStatus.length,
+      });
+    } catch (error: any) {
+      console.error('Get popular movies error:', error);
+      res.status(StatusCode.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        error: 'Failed to fetch popular movies',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      });
+    }
+  }
+
   async getFavourites(_req: Request, res: Response): Promise<void> {
     try {
-      const favorites = this.movieService.getFavoriteIds();
+      // Get favorite IDs from service
+      const favoriteIds = this.movieService.getFavoriteIds();
+
+      if (favoriteIds.length === 0) {
+        res.status(StatusCode.OK).json({
+          success: true,
+          message: 'No favorites found',
+          data: { favorites: [] },
+          count: 0,
+        });
+        return;
+      }
+
+      // Fetch full movie details for each favorite ID
+      const moviesWithDetails = await this.movieService.getFavoritesWithDetails(favoriteIds);
+
+      // Add isFavorite: true to all movies (they're all favorites on this page)
+      const moviesWithFavoriteStatus = moviesWithDetails.map(movie => ({
+        ...movie,
+        isFavorite: true,
+      }));
 
       res.status(StatusCode.OK).json({
         success: true,
         message: MESSAGES.FAVORITES_RETRIEVED,
-        data: { favorites },
-        count: favorites.length,
+        data: { favorites: moviesWithFavoriteStatus },
+        count: moviesWithFavoriteStatus.length,
       });
     } catch (error: any) {
       console.error('Get favorites error:', error);
       res.status(StatusCode.INTERNAL_SERVER_ERROR).json({
         success: false,
         error: MESSAGES.FETCH_FAVORITES_FAILED,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
       });
     }
   }

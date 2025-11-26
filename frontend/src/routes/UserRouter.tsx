@@ -8,12 +8,14 @@ import ResetVerificationOTP from '../pages/user/Auth/ResetVerificationOtp'
 import ResetPassword from '../pages/user/Auth/ResetPassword'
 import UserLayout from '../layouts/UserLayout'
 import Home from '../pages/user/Home/Home'
+import Favourites from '../pages/user/Favourites/Favourites'
 
 const UserRouter = () => {
   return (
     <Routes>
       <Route element={<UserLayout/>}>
         <Route path='/' element={<Home/>}/>
+        <Route path='/user/favourites' element={<Favourites/>}/>
         <Route path="/user/signUp" element={<UserSessionRoute><SignUp/></UserSessionRoute>}/>
         <Route path='/user/login' element={<UserSessionRoute><LoginPage/></UserSessionRoute>}/>
         <Route path="/user/verifyOtp" element={<UserSessionRoute><OTPVerification/></UserSessionRoute>}/>

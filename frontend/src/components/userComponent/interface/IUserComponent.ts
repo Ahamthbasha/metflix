@@ -3,7 +3,7 @@ export interface MovieCardProps {
   title: string;
   year: string;
   poster: string;
-  type?: "movie" | "series";
+  type: "movie" | "series";
+  onToggleFavorite: (imdbID: string) => void;
   isFavorite?: boolean;
-  onToggleFavorite?: (imdbID: string) => void;
 }

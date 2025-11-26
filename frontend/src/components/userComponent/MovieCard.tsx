@@ -1,77 +1,100 @@
 import { useState } from "react";
-import { Heart } from "lucide-react";
-import type { MovieCardProps } from "./interface/IUserComponent";
+import { Heart, Film } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import {type MovieCardProps } from "./interface/IUserComponent";
 
 const MovieCard = ({
   imdbID,
   title,
   year,
   poster,
-  type = "movie",
-  isFavorite = false,
+  type,
   onToggleFavorite,
+  isFavorite = false,
 }: MovieCardProps) => {
+  const navigate = useNavigate();
+  const [imgError, setImgError] = useState(false);
   const [isFav, setIsFav] = useState(isFavorite);
 
-  const handleFavorite = (e: React.MouseEvent) => {
+  const handleToggleFavorite = (e: React.MouseEvent) => {
     e.stopPropagation();
-    e.preventDefault();
-    setIsFav(prev => !prev);
-    onToggleFavorite?.(imdbID);
+    setIsFav(!isFav);
+    onToggleFavorite(imdbID);
   };
 
-  const posterUrl = poster && poster !== "N/A"
-    ? poster
-    : "https://via.placeholder.com/300x450/111827/ffffff?text=No+Image";
+  const handleClick = () => {
+    navigate(`/movie/${imdbID}`);
+  };
+
+  const handleImageError = () => {
+    setImgError(true);
+  };
+
+  // Check if poster is valid
+  const isValidPoster = poster && poster !== "N/A" && !imgError;
 
   return (
-    <div className="group relative overflow-hidden rounded-lg bg-black/60 border border-gray-800 shadow-xl transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:border-red-600/50 cursor-pointer">
-      {/* Poster */}
-      <div className="aspect-w-2 aspect-h-3 w-full overflow-hidden">
-        <img
-          src={posterUrl}
-          alt={title}
-          loading="lazy"
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-        />
-      </div>
+    <div
+      className="group relative cursor-pointer transition-transform duration-300 hover:scale-105"
+      onClick={handleClick}
+    >
+      {/* Poster Image or Fallback */}
+      <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-gradient-to-br from-gray-800 to-gray-900 shadow-lg">
+        {isValidPoster ? (
+          <img
+            src={poster}
+            alt={title}
+            onError={handleImageError}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          // Fallback UI for broken/missing images
+          <div className="w-full h-full flex flex-col items-center justify-center p-4 text-gray-400">
+            <Film className="w-16 h-16 mb-3 opacity-50" />
+            <p className="text-center text-sm font-medium line-clamp-2">
+              {title}
+            </p>
+          </div>
+        )}
 
-      {/* Gradient Overlay on Hover */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+        {/* Overlay on hover */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="absolute bottom-0 left-0 right-0 p-4">
+            <p className="text-white font-semibold text-sm mb-1 line-clamp-2">
+              {title}
+            </p>
+            <p className="text-gray-300 text-xs">
+              {year} • {type === "movie" ? "Movie" : "Series"}
+            </p>
+          </div>
+        </div>
 
-      {/* Favorite Heart */}
-      <button
-        onClick={handleFavorite}
-        className={`absolute top-3 right-3 z-10 p-2 rounded-full backdrop-blur-md transition-all duration-300 ${
-          isFav
-            ? "bg-red-600 text-white shadow-lg shadow-red-600/50"
-            : "bg-black/70 text-gray-400 hover:text-white hover:bg-red-600/80"
-        }`}
-      >
-        <Heart
-          size={20}
-          className={`transition-all ${isFav ? "fill-current" : ""}`}
-        />
-      </button>
+        {/* Favorite Button */}
+        <button
+          onClick={handleToggleFavorite}
+          className="absolute top-2 right-2 p-2 rounded-full bg-black/60 backdrop-blur-sm hover:bg-black/80 transition-all z-10"
+          aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
+        >
+          <Heart
+            className={`w-5 h-5 transition-colors ${
+              isFav ? "fill-red-500 text-red-500" : "text-white"
+            }`}
+          />
+        </button>
 
-      {/* Info Panel - Slides Up on Hover */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-8 group-hover:translate-y-0 transition-transform duration-300">
-        <h3 className="text-white font-bold text-lg line-clamp-2 leading-tight">
-          {title}
-        </h3>
-        <div className="flex items-center justify-between mt-2">
-          <span className="text-gray-300 text-sm font-medium">{year}</span>
-          {type && (
-            <span className="text-xs px-2 py-1 bg-red-600/80 text-white rounded-full">
-              {type === "series" ? "Series" : "Movie"}
-            </span>
-          )}
+        {/* Type Badge */}
+        <div className="absolute top-2 left-2 px-2 py-1 rounded-md bg-black/60 backdrop-blur-sm text-xs font-semibold text-white uppercase">
+          {type}
         </div>
       </div>
 
-      {/* Shine Effect */}
-      <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+      {/* Title and Year (below poster) */}
+      <div className="mt-3 px-1">
+        <h3 className="text-white font-semibold text-sm line-clamp-2 mb-1">
+          {title}
+        </h3>
+        <p className="text-gray-400 text-xs">{year}</p>
       </div>
     </div>
   );
