@@ -31,9 +31,9 @@ const corsOptions: CorsOptions = {
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true, // Keep this for future use
+  credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-User-ID"], // ✅ Add X-User-ID
+  allowedHeaders: ["Content-Type", "Authorization", "X-User-ID"], 
   exposedHeaders: ["X-User-ID"],
   preflightContinue: false,
   optionsSuccessStatus: 204
@@ -48,16 +48,6 @@ app.options('*', cors(corsOptions));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Debug middleware
-app.use((req, res, next) => {
-  console.log('=== Request Info ===');
-  console.log('Environment:', process.env.NODE_ENV);
-  console.log('User-ID Header:', req.headers['x-user-id']);
-  console.log('Origin:', req.headers.origin);
-  console.log('===================');
-  next();
-});
 
 app.use("/api/movies", movieRoutes); 
 
