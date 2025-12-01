@@ -1,21 +1,40 @@
-import { IUserMovieRepo } from "./interfaces/IUserMovieRepo"; 
+import { IUserMovieRepo } from "./interfaces/IUserMovieRepo";
 
-export class InMemoryUserMovieRepo implements IUserMovieRepo {
-  private favorites: Set<string> = new Set();
+export class SessionUserMovieRepo implements IUserMovieRepo {
+  private userFavorites: Map<string, Set<string>> = new Map();
 
-  getAllFavoriteIds(): string[] {
-    return Array.from(this.favorites);
+  getAllFavoriteIds(sessionId: string): string[] {
+    const favorites = this.userFavorites.get(sessionId);
+    return favorites ? Array.from(favorites) : [];
   }
 
-  addFavorite(imdbID: string): void {
-    this.favorites.add(imdbID);
+  addFavorite(sessionId: string, imdbID: string): void {
+    if (!this.userFavorites.has(sessionId)) {
+      this.userFavorites.set(sessionId, new Set());
+    }
+    this.userFavorites.get(sessionId)!.add(imdbID);
   }
 
-  removeFavorite(imdbID: string): void {
-    this.favorites.delete(imdbID);
+  removeFavorite(sessionId: string, imdbID: string): void {
+    const favorites = this.userFavorites.get(sessionId);
+    if (favorites) {
+      favorites.delete(imdbID);
+      if (favorites.size === 0) {
+        this.userFavorites.delete(sessionId);
+      }
+    }
   }
 
-  isFavorite(imdbID: string): boolean {
-    return this.favorites.has(imdbID);
+  isFavorite(sessionId: string, imdbID: string): boolean {
+    const favorites = this.userFavorites.get(sessionId);
+    return favorites ? favorites.has(imdbID) : false;
+  }
+
+  getTotalUsers(): number {
+    return this.userFavorites.size;
+  }
+
+  clearUserFavorites(sessionId: string): void {
+    this.userFavorites.delete(sessionId);
   }
 }

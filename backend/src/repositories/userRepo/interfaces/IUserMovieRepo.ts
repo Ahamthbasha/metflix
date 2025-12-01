@@ -1,6 +1,6 @@
 export interface IUserMovieRepo {
-  getAllFavoriteIds(): string[];
-  addFavorite(imdbID: string): void;
-  removeFavorite(imdbID: string): void;
-  isFavorite(imdbID: string): boolean;
+  getAllFavoriteIds(sessionId: string): string[];
+  addFavorite(sessionId: string, imdbID: string): void;
+  removeFavorite(sessionId: string, imdbID: string): void;
+  isFavorite(sessionId: string, imdbID: string): boolean;
 }

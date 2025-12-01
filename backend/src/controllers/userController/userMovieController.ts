@@ -1,3 +1,5 @@
+// src/controllers/userController/UserMovieController.ts
+
 import { Request, Response } from 'express';
 import { IUserMovieService } from '../../services/userService/interfaces/IUserMovieService'; 
 import { IUserMovieController } from './interfaces/IUserMovieController';
@@ -14,6 +16,7 @@ export class UserMovieController implements IUserMovieController {
   async searchMovies(req: Request, res: Response): Promise<void> {
     try {
       const { q, page = '1' } = req.query;
+      const sessionId = req.session.id; // Get session ID
 
       if (!q || typeof q !== 'string') {
         res.status(StatusCode.BAD_REQUEST).json({
@@ -43,7 +46,6 @@ export class UserMovieController implements IUserMovieController {
       const result = await this.movieService.searchMovies(q, pageNum);
 
       if (result.Response === 'False') {
-        // Use appropriate status code based on error type
         const statusCode = result.Error?.includes('specific') || result.Error?.includes('Too many')
           ? StatusCode.BAD_REQUEST
           : StatusCode.NOT_FOUND;
@@ -55,17 +57,15 @@ export class UserMovieController implements IUserMovieController {
         return;
       }
 
-      // Get favorite status for all movies in search results
+      // Get favorite status for THIS user's session
       const imdbIDs = result.Search?.map(movie => movie.imdbID) || [];
-      const favoriteStatus = this.movieService.getFavoriteStatus(imdbIDs);
+      const favoriteStatus = this.movieService.getFavoriteStatus(sessionId, imdbIDs);
 
-      // Attach isFavorite to each movie
       const moviesWithFavoriteStatus = result.Search?.map(movie => ({
         ...movie,
         isFavorite: favoriteStatus[movie.imdbID] || false,
       }));
 
-      // Enhanced response with pagination metadata
       res.status(StatusCode.OK).json({
         success: true,
         message: MESSAGES.MOVIES_FOUND,
@@ -91,9 +91,9 @@ export class UserMovieController implements IUserMovieController {
     }
   }
 
-  async getPopularMovies(_req: Request, res: Response): Promise<void> {
+  async getPopularMovies(req: Request, res: Response): Promise<void> {
     try {
-      // Fetch popular movies
+      const sessionId = req.session.id; // Get session ID
       const popularMovies = await this.movieService.getPopularMovies();
 
       if (popularMovies.length === 0) {
@@ -104,11 +104,10 @@ export class UserMovieController implements IUserMovieController {
         return;
       }
 
-      // Get favorite status for all popular movies
+      // Get favorite status for THIS user's session
       const imdbIDs = popularMovies.map(movie => movie.imdbID);
-      const favoriteStatus = this.movieService.getFavoriteStatus(imdbIDs);
+      const favoriteStatus = this.movieService.getFavoriteStatus(sessionId, imdbIDs);
 
-      // Attach isFavorite to each movie
       const moviesWithFavoriteStatus = popularMovies.map(movie => ({
         ...movie,
         isFavorite: favoriteStatus[movie.imdbID] || false,
@@ -130,10 +129,12 @@ export class UserMovieController implements IUserMovieController {
     }
   }
 
-  async getFavourites(_req: Request, res: Response): Promise<void> {
+  async getFavourites(req: Request, res: Response): Promise<void> {
     try {
-      // Get favorite IDs from service
-      const favoriteIds = this.movieService.getFavoriteIds();
+      const sessionId = req.session.id; // Get session ID
+      
+      // Get THIS user's favorite IDs
+      const favoriteIds = this.movieService.getFavoriteIds(sessionId);
 
       if (favoriteIds.length === 0) {
         res.status(StatusCode.OK).json({
@@ -145,10 +146,12 @@ export class UserMovieController implements IUserMovieController {
         return;
       }
 
-      // Fetch full movie details for each favorite ID
-      const moviesWithDetails = await this.movieService.getFavoritesWithDetails(favoriteIds);
+      // Fetch full movie details
+      const moviesWithDetails = await this.movieService.getFavoritesWithDetails(
+        sessionId, 
+        favoriteIds
+      );
 
-      // Add isFavorite: true to all movies (they're all favorites on this page)
       const moviesWithFavoriteStatus = moviesWithDetails.map(movie => ({
         ...movie,
         isFavorite: true,
@@ -173,6 +176,7 @@ export class UserMovieController implements IUserMovieController {
   async toggleFavorite(req: Request, res: Response): Promise<void> {
     try {
       const { imdbID } = req.body;
+      const sessionId = req.session.id; // Get session ID
 
       if (!imdbID || typeof imdbID !== 'string' || !imdbID.startsWith('tt')) {
         res.status(StatusCode.BAD_REQUEST).json({
@@ -182,7 +186,8 @@ export class UserMovieController implements IUserMovieController {
         return;
       }
 
-      const result = this.movieService.toggleFavorite(imdbID);
+      // Toggle for THIS user's session
+      const result = this.movieService.toggleFavorite(sessionId, imdbID);
 
       res.status(StatusCode.OK).json({
         success: true,

@@ -1,3 +1,5 @@
+// src/services/userService/UserMovieService.ts
+
 import { IUserMovieService } from './interfaces/IUserMovieService'; 
 import { IUserMovieRepo } from '../../repositories/userRepo/interfaces/IUserMovieRepo'; 
 import { searchOmdbMovies, getOmdbMovieById } from '../../utils/omdbClient'; 
@@ -59,28 +61,31 @@ export class UserMovieService implements IUserMovieService {
     }
   }
 
-  getFavoriteIds(): string[] {
-    return this._movieRepo.getAllFavoriteIds();
+  // Updated to accept sessionId
+  getFavoriteIds(sessionId: string): string[] {
+    return this._movieRepo.getAllFavoriteIds(sessionId);
   }
 
-  toggleFavorite(imdbID: string): { added: boolean } {
-    if (this._movieRepo.isFavorite(imdbID)) {
-      this._movieRepo.removeFavorite(imdbID);
+  // Updated to accept sessionId
+  toggleFavorite(sessionId: string, imdbID: string): { added: boolean } {
+    if (this._movieRepo.isFavorite(sessionId, imdbID)) {
+      this._movieRepo.removeFavorite(sessionId, imdbID);
       return { added: false };
     } else {
-      this._movieRepo.addFavorite(imdbID);
+      this._movieRepo.addFavorite(sessionId, imdbID);
       return { added: true };
     }
   }
 
-  getFavoriteStatus(imdbIDs: string[]): Record<string, boolean> {
+  // Updated to accept sessionId
+  getFavoriteStatus(sessionId: string, imdbIDs: string[]): Record<string, boolean> {
     return imdbIDs.reduce((acc, id) => {
-      acc[id] = this._movieRepo.isFavorite(id);
+      acc[id] = this._movieRepo.isFavorite(sessionId, id);
       return acc;
     }, {} as Record<string, boolean>);
   }
 
-  async getFavoritesWithDetails(imdbIDs: string[]): Promise<IMovie[]> {
+  async getFavoritesWithDetails(sessionId: string, imdbIDs: string[]): Promise<IMovie[]> {
     if (imdbIDs.length === 0) {
       return [];
     }
