@@ -1,335 +1,232 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+// src/pages/user/Home.tsx
+
+import { useState, useEffect, useRef } from "react";
 import MovieCard from "../../../components/userComponent/MovieCard";
 import { Search, Loader2, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 import { getMovies, getPopularMovies, toggleFavourite } from "../../../api/action/userAction";
 import { toast } from "react-toastify";
-import { debounce } from "lodash";
-import type { Movie, PaginationInfo } from "../interface/IHome";
-
+import useDebounce from "../../../hooks/useDebounce";
+import type { Movie } from "../interface/IHome";
 
 const Home = () => {
   const [query, setQuery] = useState("");
   const [movies, setMovies] = useState<Movie[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Start with loading = true
   const [page, setPage] = useState(1);
-  const [pagination, setPagination] = useState<PaginationInfo>({
-    currentPage: 1,
-    totalResults: 0,
-    resultsPerPage: 0,
-    hasMore: false,
-  });
-  const [isSearchActive, setIsSearchActive] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  
+  const [totalResults, setTotalResults] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [isSearching, setIsSearching] = useState(false); // Track if user is searching
+
+  const debouncedQuery = useDebounce(query.trim(), 600);
   const moviesSectionRef = useRef<HTMLDivElement>(null);
 
+  // Load Popular Movies on Mount
   useEffect(() => {
-    const loadPopularMovies = async () => {
-      setLoading(true);
+    const loadPopular = async () => {
       try {
+        setLoading(true);
         const res = await getPopularMovies();
-        if (res.success && res.data?.movies) {
+
+        if (res.success && res.data?.movies?.length > 0) {
           setMovies(res.data.movies);
+          setTotalResults(res.data.movies.length);
+          setError(null);
         } else {
-          toast.error("Failed to load popular movies");
+          toast.info("Could not load popular movies");
+          setMovies([]);
         }
-      } catch (error) {
-        console.error("Failed to load popular movies:", error);
+      } catch (err) {
         toast.error("Failed to load popular movies");
+        setMovies([]);
       } finally {
         setLoading(false);
       }
     };
 
-    loadPopularMovies();
+    loadPopular();
   }, []);
 
-  const searchMovies = useCallback(
-    debounce(async (searchQuery: string, pageNum: number) => {
-      setSearchError(null);
-      if (!searchQuery.trim()) {
-        setLoading(true);
-        try {
-          const res = await getPopularMovies();
-          if (res.success && res.data?.movies) {
-            setMovies(res.data.movies);
-          }
-        } catch (error) {
-          console.error("Failed to load popular movies:", error);
-        } finally {
-          setLoading(false);
+  // Handle Search or go back to popular
+  useEffect(() => {
+    const fetchMovies = async () => {
+      if (!debouncedQuery) {
+        // User cleared search → reload popular movies
+        setIsSearching(false);
+        setPage(1);
+        const res = await getPopularMovies();
+        if (res.success) {
+          setMovies(res.data.movies || []);
+          setTotalResults(res.data.movies?.length || 0);
+          setError(null);
         }
-        
-        setIsSearchActive(false);
-        setPagination({
-          currentPage: 1,
-          totalResults: 0,
-          resultsPerPage: 0,
-          hasMore: false,
-        });
         return;
       }
 
-      if (searchQuery.trim().length < 2) {
-        setSearchError("Please enter at least 2 characters to search");
+      if (debouncedQuery.length < 2) {
+        setError("Type at least 2 characters");
         setMovies([]);
-        setIsSearchActive(true);
+        setIsSearching(true);
         return;
       }
 
+      setIsSearching(true);
       setLoading(true);
-      try {
-        const data = await getMovies(searchQuery, pageNum);
+      setError(null);
 
-        if (data.success && data.data?.Search) {
-          setMovies(data.data.Search);
-          setIsSearchActive(true);
-          setSearchError(null);
-          
-          if (data.pagination) {
-            setPagination(data.pagination);
-          } else {
-            const totalResults = parseInt(data.data.totalResults || '0', 10);
-            setPagination({
-              currentPage: pageNum,
-              totalResults,
-              resultsPerPage: data.data.Search.length,
-              hasMore: totalResults > pageNum * 10,
-            });
-          }
+      try {
+        const res = await getMovies(debouncedQuery, page);
+
+        if (res.success && res.data?.Search) {
+          setMovies(res.data.Search);
+          setTotalResults(parseInt(res.data.totalResults || "0", 10));
         } else {
           setMovies([]);
-          setIsSearchActive(true);
-          setPagination({
-            currentPage: pageNum,
-            totalResults: 0,
-            resultsPerPage: 0,
-            hasMore: false,
-          });
-          const errorMessage = data.error || "No movies found";
-          setSearchError(errorMessage);
-          if (errorMessage.includes("specific") || errorMessage.includes("characters")) {
-            toast.warning(errorMessage);
-          } else {
-            toast.info(errorMessage);
-          }
+          setTotalResults(0);
+          setError(res.error || "No movies found");
         }
       } catch (err: any) {
-        const errorMessage = err.response?.data?.error || "Search failed. Please try again.";
-        toast.error(errorMessage);
-        setSearchError(errorMessage);
+        const msg = err.response?.data?.error || "Search failed";
+        setError(msg);
+        toast.error(msg);
         setMovies([]);
-        setIsSearchActive(true);
       } finally {
         setLoading(false);
       }
-    }, 500),
-    []
-  );
+    };
 
-  useEffect(() => {
-    if (query || page > 1) {
-      searchMovies(query, page);
-    }
-  }, [query, page, searchMovies]);
+    fetchMovies();
+  }, [debouncedQuery, page]);
 
+  // Reset page when query changes
   useEffect(() => {
     setPage(1);
-  }, [query]);
+  }, [debouncedQuery]);
 
   const handleToggleFavorite = async (imdbID: string) => {
     try {
       const res = await toggleFavourite(imdbID);
       if (res.success) {
-        setMovies(prevMovies => 
-          prevMovies.map(movie => 
-            movie.imdbID === imdbID 
-              ? { ...movie, isFavorite: res.data?.added }
-              : movie
-          )
+        const added = res.data.added;
+        setMovies((prev) =>
+          prev.map((m) => (m.imdbID === imdbID ? { ...m, isFavorite: added } : m))
         );
-        
-        toast.success(res.data?.added ? "Added to Favorites" : "Removed from Favorites");
+        toast.success(added ? "Added to favorites" : "Removed from favorites");
       }
     } catch {
       toast.error("Failed to update favorite");
     }
   };
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (query.trim() && query.trim().length >= 2) {
-      setPage(1);
-      searchMovies(query, 1);
-    } else if (query.trim().length < 2) {
-      toast.warning("Please enter at least 2 characters to search");
-    }
-  };
+  const totalPages = Math.ceil(totalResults / 10);
+  const hasMore = totalResults > page * 10;
 
-  const handlePreviousPage = () => {
-    if (page > 1) {
-      setPage(page - 1);
-      // Smooth scroll to movies section
-      moviesSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
-  const handleNextPage = () => {
-    if (pagination.hasMore) {
-      setPage(page + 1);
-      // Smooth scroll to movies section
-      moviesSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
-  const totalPages = Math.ceil(pagination.totalResults / 10);
+  const sectionTitle = isSearching
+    ? `Results for "${debouncedQuery}"`
+    : "Popular Movies";
 
   return (
-    <div className="min-h-screen bg-black text-white pt-20">
-      {/* Hero Section */}
-      <section className="relative h-screen flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-red-900/40 via-black to-black" />
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-3xl" />
+    <div className="min-h-screen bg-black text-white">
+      {/* Hero */}
+      <section className="relative h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-red-900/30 via-black to-black">
+        <div className="absolute inset-0 bg-black/70 backdrop-blur-3xl" />
 
-        <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tighter mb-6 leading-tight">
+        <div className="relative z-10 text-center px-6 max-w-5xl mx-auto">
+          <h1 className="text-5xl md:text-7xl font-bold mb-6">
             Unlimited movies, TV shows, and more
           </h1>
-          <p className="text-xl md:text-3xl text-gray-300 mb-10">
+          <p className="text-xl md:text-3xl text-gray-300 mb-12">
             Watch anywhere. Cancel anytime.
           </p>
 
-          <form onSubmit={handleSearchSubmit} className="max-w-2xl mx-auto">
-            <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
-              <div className="relative w-full sm:w-96">
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search movies, TV shows..."
-                  className="w-full px-6 py-5 pr-14 bg-white/10 backdrop-blur-md border border-white/20 rounded-full text-white placeholder-gray-400 text-lg focus:outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/30 transition-all"
-                  minLength={2}
-                />
-                <Search className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 w-6 h-6 pointer-events-none" />
-              </div>
-
-              <button
-                type="submit"
-                className="bg-red-600 hover:bg-red-700 px-10 py-5 rounded-full font-bold text-lg transition transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={query.trim().length < 2}
-              >
-                Search
-              </button>
+          <div className="max-w-2xl mx-auto">
+            <div className="relative">
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search for movies or TV shows..."
+                className="w-full px-8 py-6 pr-16 text-lg bg-white/10 backdrop-blur-lg border border-white/20 rounded-full focus:outline-none focus:ring-4 focus:ring-red-600/60 placeholder-gray-400"
+              />
+              <Search className="absolute right-6 top-1/2 -translate-y-1/2 w-7 h-7 text-gray-400" />
             </div>
-            
-            {/* Hint text */}
             {query.length > 0 && query.length < 2 && (
               <p className="text-yellow-400 text-sm mt-3">
-                Enter at least 2 characters to search
+                Please enter at least 2 characters
               </p>
             )}
-          </form>
+          </div>
         </div>
       </section>
 
       {/* Movies Section */}
-      <section ref={moviesSectionRef} className="py-20 px-6 scroll-mt-20">
+      <section ref={moviesSectionRef} className="py-20 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="flex justify-between items-center mb-10">
-            <h2 className="text-4xl font-bold">
-              {query ? `Results for "${query}"` : "Popular Movies"}
-            </h2>
-            
-            {/* Results info */}
-            {isSearchActive && pagination.totalResults > 0 && (
-              <p className="text-gray-400 text-lg hidden md:block">
-                Showing {((page - 1) * 10) + 1}-{Math.min(page * 10, pagination.totalResults)} of {pagination.totalResults} results
-              </p>
-            )}
-          </div>
+          <h2 className="text-4xl font-bold mb-10">{sectionTitle}</h2>
 
-          {/* Loading Spinner */}
+          {/* Loading */}
           {loading && (
-            <div className="flex justify-center py-20">
+            <div className="flex justify-center py-32">
               <Loader2 className="w-16 h-16 animate-spin text-red-600" />
             </div>
           )}
 
-          {/* Error Message */}
-          {!loading && searchError && movies.length === 0 && (
-            <div className="bg-red-900/20 border border-red-600/50 rounded-lg p-6 mb-8">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h3 className="text-lg font-semibold text-red-400 mb-1">Search Issue</h3>
-                  <p className="text-gray-300">{searchError}</p>
-                  {searchError.includes("specific") && (
-                    <p className="text-gray-400 text-sm mt-2">
-                      Try searching with more specific terms, like "The Dark Knight" instead of just "a"
-                    </p>
-                  )}
-                </div>
-              </div>
+          {/* Error */}
+          {error && !loading && movies.length === 0 && (
+            <div className="text-center py-20">
+              <AlertCircle className="w-16 h-16 mx-auto mb-6 text-yellow-500" />
+              <p className="text-xl text-gray-300">{error}</p>
             </div>
           )}
 
           {/* Movies Grid */}
-          {!loading && (
+          {!loading && movies.length > 0 && (
             <>
-              {movies.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-                  {movies.map((movie) => (
-                    <MovieCard
-                      key={movie.imdbID}
-                      imdbID={movie.imdbID}
-                      title={movie.Title}
-                      year={movie.Year}
-                      poster={movie.Poster}
-                      type={movie.Type as "movie" | "series"}
-                      isFavorite={movie.isFavorite || false}
-                      onToggleFavorite={handleToggleFavorite}
-                    />
-                  ))}
-                </div>
-              ) : !searchError && (
-                <div className="text-center py-20">
-                  <p className="text-gray-400 text-xl">No movies found. Try a different search.</p>
-                </div>
-              )}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                {movies.map((movie) => (
+                  <MovieCard
+                    key={movie.imdbID}
+                    imdbID={movie.imdbID}
+                    title={movie.Title}
+                    year={movie.Year}
+                    poster={movie.Poster}
+                    type={movie.Type as "movie" | "series"}
+                    isFavorite={movie.isFavorite}
+                    onToggleFavorite={handleToggleFavorite}
+                  />
+                ))}
+              </div>
 
-              {/* Pagination Controls */}
-              {isSearchActive && pagination.totalResults > 0 && (
-                <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-12">
+              {/* Pagination - only show in search mode */}
+              {isSearching && totalResults > 10 && (
+                <div className="flex justify-center items-center gap-8 mt-16">
                   <button
-                    onClick={handlePreviousPage}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold text-lg transition ${
-                      page === 1
-                        ? "bg-gray-800 text-gray-500 cursor-not-allowed"
-                        : "bg-red-600 hover:bg-red-700 transform hover:scale-105"
-                    }`}
+                    className="flex items-center gap-3 px-8 py-4 bg-red-600 hover:bg-red-700 rounded-full font-semibold disabled:bg-gray-800 disabled:cursor-not-allowed transition"
                   >
-                    <ChevronLeft className="w-5 h-5" />
-                    Previous
+                    <ChevronLeft className="w-5 h-5" /> Previous
                   </button>
 
-                  <span className="text-gray-300 text-lg font-medium">
+                  <span className="text-lg font-medium">
                     Page {page} of {totalPages}
                   </span>
 
                   <button
-                    onClick={handleNextPage}
-                    disabled={!pagination.hasMore}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold text-lg transition ${
-                      !pagination.hasMore
-                        ? "bg-gray-800 text-gray-500 cursor-not-allowed"
-                        : "bg-red-600 hover:bg-red-700 transform hover:scale-105"
-                    }`}
+                    onClick={() => setPage((p) => p + 1)}
+                    disabled={!hasMore}
+                    className="flex items-center gap-3 px-8 py-4 bg-red-600 hover:bg-red-700 rounded-full font-semibold disabled:bg-gray-800 disabled:cursor-not-allowed transition"
                   >
-                    Next
-                    <ChevronRight className="w-5 h-5" />
+                    Next <ChevronRight className="w-5 h-5" />
                   </button>
                 </div>
+              )}
+
+              {/* Results counter */}
+              {isSearching && (
+                <p className="text-center text-gray-400 mt-8">
+                  Showing {(page - 1) * 10 + 1}–{Math.min(page * 10, totalResults)} of{" "}
+                  {totalResults.toLocaleString()} results
+                </p>
               )}
             </>
           )}

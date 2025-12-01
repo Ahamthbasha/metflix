@@ -1,4 +1,3 @@
-// src/controllers/userController/UserMovieController.ts
 import { Request, Response } from 'express';
 import { IUserMovieService } from '../../services/userService/interfaces/IUserMovieService'; 
 import { IUserMovieController } from './interfaces/IUserMovieController';
@@ -24,7 +23,6 @@ export class UserMovieController implements IUserMovieController {
         return;
       }
 
-      // Validate minimum search length on controller level too
       if (q.trim().length < 2) {
         res.status(StatusCode.BAD_REQUEST).json({
           success: false,

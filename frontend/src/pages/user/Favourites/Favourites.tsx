@@ -25,7 +25,6 @@ const Favourites = () => {
       const res = await getFavourites();
       
       if (res.success) {
-        // Backend now returns full movie objects with details and isFavorite: true
         setFavourites(res.data?.favorites || []);
         
         if (showRefreshIndicator && res.data?.favorites?.length > 0) {
@@ -49,7 +48,6 @@ const Favourites = () => {
       const res = await toggleFavourite(imdbID);
       
       if (res.success) {
-        // Remove from local state if removed from favorites
         if (!res.data?.added) {
           setFavourites(prevFavourites => 
             prevFavourites.filter(movie => movie.imdbID !== imdbID)
