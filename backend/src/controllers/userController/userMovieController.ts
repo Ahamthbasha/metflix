@@ -157,6 +157,8 @@ export class UserMovieController implements IUserMovieController {
         isFavorite: true,
       }));
 
+      console.log('Fetched favorite movies with details:', moviesWithFavoriteStatus);
+
       res.status(StatusCode.OK).json({
         success: true,
         message: MESSAGES.FAVORITES_RETRIEVED,
