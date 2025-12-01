@@ -1,10 +1,9 @@
-// src/api/action/userAction.ts
-import { API } from "../../service/axios";
+import API from "../../service/axios";
 import userEndpoint from "../../types/endpoints/userEndpoint";
 
 export const getMovies = async (query: string, page: number = 1) => {
   try {
-    const response = await API.get(`${userEndpoint.movieRoutes.getAllMovies}`, {
+    const response = await API.get(`${userEndpoint.getAllMovies}`, {
       params: { q: query, page }
     });
     return response.data;
@@ -15,7 +14,7 @@ export const getMovies = async (query: string, page: number = 1) => {
 
 export const getPopularMovies = async () => {
   try {
-    const response = await API.get(`${userEndpoint.movieRoutes.getPopularMovies}`);
+    const response = await API.get(`${userEndpoint.getPopularMovies}`);
     return response.data;
   } catch (error) {
     throw error;
@@ -24,7 +23,7 @@ export const getPopularMovies = async () => {
 
 export const getFavourites = async () => {
   try {
-    const response = await API.get(`${userEndpoint.movieRoutes.getFavouriteMovies}`);
+    const response = await API.get(`${userEndpoint.getFavouriteMovies}`);
     return response.data;
   } catch (error) {
     throw error;
@@ -33,7 +32,7 @@ export const getFavourites = async () => {
 
 export const toggleFavourite = async (imdbID: string) => {
   try {
-    const response = await API.post(`${userEndpoint.movieRoutes.toggleFavouriteMovie}`, { 
+    const response = await API.post(`${userEndpoint.toggleFavouriteMovie}`, { 
       imdbID 
     });
     return response.data;
