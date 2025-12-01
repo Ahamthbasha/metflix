@@ -1,5 +1,3 @@
-// src/controllers/userController/UserMovieController.ts
-
 import { Request, Response } from 'express';
 import { IUserMovieService } from '../../services/userService/interfaces/IUserMovieService'; 
 import { IUserMovieController } from './interfaces/IUserMovieController';
@@ -16,7 +14,7 @@ export class UserMovieController implements IUserMovieController {
   async searchMovies(req: Request, res: Response): Promise<void> {
     try {
       const { q, page = '1' } = req.query;
-      const sessionId = req.session.id; // Get session ID
+      const userId = req.userId; // ✅ From middleware
 
       if (!q || typeof q !== 'string') {
         res.status(StatusCode.BAD_REQUEST).json({
@@ -57,9 +55,9 @@ export class UserMovieController implements IUserMovieController {
         return;
       }
 
-      // Get favorite status for THIS user's session
+      // Get favorite status for THIS user
       const imdbIDs = result.Search?.map(movie => movie.imdbID) || [];
-      const favoriteStatus = this.movieService.getFavoriteStatus(sessionId, imdbIDs);
+      const favoriteStatus = this.movieService.getFavoriteStatus(userId, imdbIDs);
 
       const moviesWithFavoriteStatus = result.Search?.map(movie => ({
         ...movie,
@@ -93,7 +91,7 @@ export class UserMovieController implements IUserMovieController {
 
   async getPopularMovies(req: Request, res: Response): Promise<void> {
     try {
-      const sessionId = req.session.id; // Get session ID
+      const userId = req.userId; // ✅ From middleware
       const popularMovies = await this.movieService.getPopularMovies();
 
       if (popularMovies.length === 0) {
@@ -104,9 +102,9 @@ export class UserMovieController implements IUserMovieController {
         return;
       }
 
-      // Get favorite status for THIS user's session
+      // Get favorite status for THIS user
       const imdbIDs = popularMovies.map(movie => movie.imdbID);
-      const favoriteStatus = this.movieService.getFavoriteStatus(sessionId, imdbIDs);
+      const favoriteStatus = this.movieService.getFavoriteStatus(userId, imdbIDs);
 
       const moviesWithFavoriteStatus = popularMovies.map(movie => ({
         ...movie,
@@ -131,10 +129,10 @@ export class UserMovieController implements IUserMovieController {
 
   async getFavourites(req: Request, res: Response): Promise<void> {
     try {
-      const sessionId = req.session.id; // Get session ID
+      const userId = req.userId; // ✅ From middleware
       
       // Get THIS user's favorite IDs
-      const favoriteIds = this.movieService.getFavoriteIds(sessionId);
+      const favoriteIds = this.movieService.getFavoriteIds(userId);
 
       if (favoriteIds.length === 0) {
         res.status(StatusCode.OK).json({
@@ -148,7 +146,7 @@ export class UserMovieController implements IUserMovieController {
 
       // Fetch full movie details
       const moviesWithDetails = await this.movieService.getFavoritesWithDetails(
-        sessionId, 
+        userId, 
         favoriteIds
       );
 
@@ -178,7 +176,7 @@ export class UserMovieController implements IUserMovieController {
   async toggleFavorite(req: Request, res: Response): Promise<void> {
     try {
       const { imdbID } = req.body;
-      const sessionId = req.session.id; // Get session ID
+      const userId = req.userId; // ✅ From middleware
 
       if (!imdbID || typeof imdbID !== 'string' || !imdbID.startsWith('tt')) {
         res.status(StatusCode.BAD_REQUEST).json({
@@ -188,8 +186,8 @@ export class UserMovieController implements IUserMovieController {
         return;
       }
 
-      // Toggle for THIS user's session
-      const result = this.movieService.toggleFavorite(sessionId, imdbID);
+      // Toggle for THIS user
+      const result = this.movieService.toggleFavorite(userId, imdbID);
 
       res.status(StatusCode.OK).json({
         success: true,
