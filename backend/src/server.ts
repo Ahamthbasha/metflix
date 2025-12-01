@@ -15,13 +15,17 @@ import { StatusCode } from "./utils/enums";
 import movieRoutes from "./routes/movieRoutes";
 
 declare module 'express-session' {
-    interface SessionData {
+  interface SessionData {
     initialized?: boolean;
   }
 }
 
 const app = express();
 const PORT: number = Number(process.env.PORT) || 3000;
+
+// 🔥 CRITICAL FIX: Trust proxy for Render.com/Heroku/Railway
+// This MUST come before session middleware
+app.set('trust proxy', 1);
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -35,13 +39,16 @@ const corsOptions: CorsOptions = {
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.log(`❌ CORS blocked origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
   exposedHeaders: ["set-cookie"],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };
 
 app.use(
@@ -50,6 +57,10 @@ app.use(
 
 app.use(cookieParser());
 app.use(cors(corsOptions));
+
+// Handle preflight explicitly
+app.options('*', cors(corsOptions));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -59,15 +70,29 @@ app.use(
     resave: false,
     saveUninitialized: true,
     name: "movieapp.sid",
+    proxy: true, // 🔥 CRITICAL: Trust proxy for secure cookies
     cookie: {
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 30 * 24 * 60 * 60 * 1000,
-      domain: process.env.NODE_ENV === "production" ? undefined : undefined,
+      path: '/',
     },
   })
 );
+
+// Debug middleware - see what's happening
+app.use((req, res, next) => {
+  console.log('=== Request Info ===');
+  console.log('Environment:', process.env.NODE_ENV);
+  console.log('Protocol:', req.protocol); // Should be 'https' in production
+  console.log('Secure:', req.secure); // Should be 'true' in production
+  console.log('Session ID:', req.session.id);
+  console.log('Cookie in Request:', req.headers.cookie);
+  console.log('Origin:', req.headers.origin);
+  console.log('===================');
+  next();
+});
 
 app.use((req, res, next) => {
   if (!req.session.initialized) {
@@ -91,6 +116,13 @@ app.use("/api", (_req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV || "development"} mode on port ${PORT}`);
-  console.log(`CORS enabled for: ${allowedOrigins.join(", ")}`);
+  console.log(`
+  Environment:        ${process.env.NODE_ENV || "development"}
+  Port:               ${PORT}
+  Trust Proxy:        ENABLED ✓
+  Session Cookie:     movieapp.sid
+  Cookie Secure:      ${process.env.NODE_ENV === "production"}
+  Cookie SameSite:    ${process.env.NODE_ENV === "production" ? "none" : "lax"}
+   CORS Origins:       ${allowedOrigins.join(", ")}
+  `);
 });
